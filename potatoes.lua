@@ -74,4 +74,3 @@ minetest.register_alias("farming_plus:potatoe_seed", "farming_plus:potato_seed")
 minetest.register_alias("farming_plus:potatoe", "farming_plus:potato")
 minetest.register_alias("farming_plus:potatoe_1", "farming_plus:potato_1")
 minetest.register_alias("farming_plus:potatoe_2", "farming_plus:potato_2")
-

@@ -68,7 +68,7 @@ function farming.generate_tree(pos, trunk, leaves, underground, replacements)
 	if ret or minetest.get_node_light(pos) < 8 then
 		return
 	end
-	
+
 	node = {name = ""}
 	for dy=1,4 do
 		pos.y = pos.y+dy
@@ -83,11 +83,11 @@ function farming.generate_tree(pos, trunk, leaves, underground, replacements)
 		minetest.set_node(pos, node)
 		pos.y = pos.y-dy
 	end
-	
+
 	if not replacements then
 		replacements = {}
 	end
-	
+
 	node.name = leaves
 	pos.y = pos.y+3
 	for dx=-2,2 do
@@ -96,7 +96,7 @@ function farming.generate_tree(pos, trunk, leaves, underground, replacements)
 				pos.x = pos.x+dx
 				pos.y = pos.y+dy
 				pos.z = pos.z+dz
-				
+
 				if dx == 0 and dz == 0 and dy==3 then
 					if minetest.get_node(pos).name == "air" and math.random(1, 5) <= 4 then
 						minetest.set_node(pos, node)
@@ -136,7 +136,7 @@ function farming.generate_tree(pos, trunk, leaves, underground, replacements)
 						end
 					end
 				end
-				
+
 				pos.x = pos.x-dx
 				pos.y = pos.y-dy
 				pos.z = pos.z-dz
@@ -185,7 +185,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
                                                 break
                                         end
                                 end
-                                
+
                                 if ground_y then
                                         local p = {x=x,y=ground_y+1,z=z}
                                         local nn = minetest.get_node(p).name
@@ -203,7 +203,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
                                                 end
                                         end
                                 end
-                                
+
                         end
                 end
                 end
