@@ -19,10 +19,9 @@ function farming.add_plant(full_grown, names, interval, chance)
 				return
 			end
 			pos.y = pos.y+1
-			if not minetest.get_node_light(pos) then
-				return
-			end
-			if minetest.get_node_light(pos) < 8 then
+			local light = minetest.get_node_light(pos)
+			if not light
+			or light < 8 then
 				return
 			end
 			local step = nil
