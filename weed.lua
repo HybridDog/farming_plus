@@ -1,6 +1,5 @@
 -- main `S` code in init.lua
-local S
-S = farming.S
+local S = farming.S
 
 minetest.register_node(":farming:weed", {
 	description = S("Weed"),

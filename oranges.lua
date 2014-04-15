@@ -1,6 +1,5 @@
 -- main `S` code in init.lua
-local S
-S = farming.S
+local S = farming.S
 
 minetest.register_craftitem("farming_plus:orange_seed", {
 	description = S("Orange Seeds"),
