@@ -68,7 +68,7 @@ function farming.generate_tree(pos, trunk, leaves, underground, replacements)
 		return
 	end
 
-	node = {name = ""}
+	local node = {name = ""}
 	for dy=1,4 do
 		pos.y = pos.y+dy
 		if minetest.get_node(pos).name ~= "air" then
@@ -280,7 +280,7 @@ for lvl = 1, 6, 1 do
 end
 
 
-minetest.register_alias("farming:cotton", "farming:cotton_3")
+--minetest.register_alias("farming:cotton", "farming:cotton_3")
 minetest.register_alias("farming:wheat_harvested", "farming:wheat")
 minetest.register_alias("farming:dough", "farming:flour")
 minetest.register_abm({
