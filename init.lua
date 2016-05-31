@@ -1,3 +1,10 @@
+if farming.add_plant
+or farming.registered_plants
+or farming.generate_tree
+or farming.seeds then
+	error("[farming_plus] some field(s) already exist")
+end
+
 farming.registered_plants = {}
 
 -- Boilerplate to support localized strings if intllib mod is installed.
