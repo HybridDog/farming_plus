@@ -8,8 +8,8 @@ end
 local farming_plus_registered_plants = {}
 
 -- Boilerplate to support localized strings if intllib mod is installed.
-if minetest.get_modpath("intllib") then
-   farming.S = intllib.Getter()
+if minetest.global_exists"intllib" then
+	farming.S = intllib.Getter(minetest.get_current_modname())
 else
 	farming.S = function ( s ) return s end
 end
