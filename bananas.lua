@@ -1,13 +1,37 @@
 -- main `S` code in init.lua
 local S = farming.S
 
+local banana_seed = 321
+
+-- TODO: test if get_random works at all
+local function get_random(pos)
+	return PseudoRandom(math.abs(pos.x + pos.y * 3 + pos.z * 5) + banana_seed)
+end
+
+local function facedir_to_offset(dir, zoff)
+	if dir == 0 then
+		return zoff
+	end
+	if dir == 1 then
+		return 1
+	end
+	if dir == 2 then
+		return -zoff
+	end
+	return -1
+end
+
 -- TODO: hopefully it doesn't look too swastika
+local c_banana_stem, c_banana_leaf, c_banana_bow, c_banana_trager
 local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
-	local set = minetest.set_node
-	local orient = math.random(0, 3)
-	for i = 0, stem_h do
-		set({x=pos.x, y=pos.y+i, z=pos.z},
-			{name="farming_plus:banana_stem"})
+	local yo = area.ystride
+	local zo = area.zstride
+	local orient = pr:next(0, 3)
+	local vp = area:indexp(pos)
+	local vi = vp
+	for _ = 0, stem_h do
+		nodes[vi] = c_banana_stem
+		vi = vi + yo
 	end
 	local haveleaves = {{},{},{},{}}
 	-- beware loop order for leaf_rot
@@ -16,30 +40,30 @@ local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
 		for i = 2, stem_h+2 do
 			-- put leaves with a 1 to 2 vertical air hole between them
 			if not haveleaves[lorient+1][i-1]
-			and (i > stem_h or math.random() > 0.5
+			and (i > stem_h or pr:next(1, 2) == 2
 				or (i >= 4 and not haveleaves[lorient+1][i-2])
 			) then
 				haveleaves[lorient+1][i] = true
-				local dir = minetest.facedir_to_dir(lorient)
-				local lp = vector.add(pos, dir)
-				lp.y = lp.y + i
+				local dir = facedir_to_offset(lorient, zo)
+				local vi = vp + dir + i * yo
 				if lorient == orient then
 					if i == stem_h then
 						-- place next to bananas
-						local ndir = minetest.facedir_to_dir((lorient+1) % 4)
-						lp = vector.add(lp, ndir)
+						local ndir = facedir_to_offset((lorient+1) % 4, zo)
+						vi = vi + ndir
 					elseif i == stem_h+1 then
 						-- place onto the next bow
-						lp = vector.add(lp, dir)
+						vi = vi + dir
 					end
 				end
 				-- set a leaf where it's near the stem
-				set(lp, {name="farming_plus:banana_leaf", param2=lorient})
+				nodes[vi] = c_banana_leaf
+				param2s[vi] = lorient
 
 				-- set a leaf touching the previous one on only an upper corner
-				lp = vector.add(lp, dir)
-				lp.y = lp.y+1
-				set(lp, {name="farming_plus:banana_leaf", param2=lorient})
+				vi = vi + dir + yo
+				nodes[vi] = c_banana_leaf
+				param2s[vi] = lorient
 
 				-- set a leaf next to it, alternatingly left and right
 				local lnorient
@@ -49,30 +73,61 @@ local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
 					lnorient = (lorient + 3) % 4
 				end
 				leaf_rot = not leaf_rot
-				local ndir = minetest.facedir_to_dir(lnorient)
-				lp = vector.add(lp, ndir)
-				set(lp, {name="farming_plus:banana_leaf", param2=lorient})
+				local ndir = facedir_to_offset(lnorient, zo)
+				vi = vi + ndir
+				nodes[vi] = c_banana_leaf
+				param2s[vi] = lorient
 			end
 		end
 	end
 
 	-- put the bow, banana and top leaves
-	local p = {x=pos.x, y=pos.y+stem_h+1, z=pos.z}
-	set(p, {name="farming_plus:banana_stem_bow", param2=orient})
-	local dir = minetest.facedir_to_dir(orient)
-	local p2 = vector.add(p, dir)
-	set(p2, {name="farming_plus:banana_stem_bow", param2=(orient + 2) % 4})
-	p2.y = p2.y-1
-	set(p2, {name="farming_plus:bananas"})
-	p.y = p.y+1
-	set(p, {name="farming_plus:banana_leaf", param2=orient})
-	p2.y = p2.y+1 + math.random(2)
-	set(p2, {name="farming_plus:banana_leaf", param2=orient})
+	nodes[vi] = c_banana_bow
+	param2s[vi] = orient
+	local dir = facedir_to_offset(orient, zo)
+	local vi2 = vi + dir
+	nodes[vi2] = c_banana_bow
+	param2s[vi2] = (orient + 2) % 4
+	vi2 = vi2 - yo
+	nodes[vi2] = c_banana_trager
+	vi = vi + yo
+	nodes[vi] = c_banana_leaf
+	param2s[vi] = orient
+	vi2 = vi2 + yo * pr:next(2, 3)
+	nodes[vi2] = c_banana_leaf
+	param2s[vi2] = orient
 end
 
 local function spawn_banana(pos)
+	local t1 = minetest.get_us_time()
+
+	local pr = get_random(pos)
 	local stem_h = math.random(4, 6)
-	calc_banana(pos, stem_h)
+
+	-- the maximum width represents 1 bow + 2 banana nodes
+	local vwidth = 3
+	-- the stem grows from 0 to <stem_h>, above there's a bow and at max 2
+	-- leaves
+	local vheight = stem_h + 3
+
+	local manip = minetest.get_voxel_manip()
+	local emin, emax = manip:read_from_map(
+		{x = pos.x - vwidth, y = pos.y, z = pos.z - vwidth},
+		{x = pos.x + vwidth, y = pos.y + vheight, z = pos.z + vwidth}
+	)
+	local area = VoxelArea:new{MinEdge=emin, MaxEdge=emax}
+	local nodes = manip:get_data()
+	local param2s = manip:get_param2_data()
+
+	calc_banana(pos, stem_h, area, nodes, param2s, pr)
+
+	manip:set_data(nodes)
+	manip:set_param2_data(param2s)
+	manip:write_to_map()
+
+	minetest.log("info", "[farming_plus] a banana plant grew at " ..
+		minetest.pos_to_string(pos) .. " in " ..
+		(minetest.get_us_time() - t1) / 1000000 .. " s")
 end
 
 
@@ -124,6 +179,7 @@ minetest.register_node("farming_plus:banana_leaf", {
 	sounds = default.node_sound_leaves_defaults(),
 })
 
+-- TODO: make it look like many bananas
 minetest.register_node("farming_plus:bananas", {
 	description = S"Banana Träger",
 	tiles = {"farming_banana.png"},
@@ -137,7 +193,13 @@ minetest.register_node("farming_plus:bananas", {
 	drop = "farming_plus:banana 5",
 })
 
+c_banana_stem = minetest.get_content_id"farming_plus:banana_stem"
+c_banana_bow = minetest.get_content_id"farming_plus:banana_stem_bow"
+c_banana_leaf = minetest.get_content_id"farming_plus:banana_leaf"
+c_banana_trager = minetest.get_content_id"farming_plus:bananas"
 
+
+-- TODO: generate, sapling, textures
 
 minetest.register_node("farming_plus:banana_sapling", {
 	description = S("Banana Tree Sapling"),
