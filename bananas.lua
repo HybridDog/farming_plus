@@ -3,7 +3,7 @@ local S = farming.S
 
 local banana_seed = 321
 
--- TODO: test if get_random works at all
+-- I'm not sure if get_random works at all
 local function get_random(pos)
 	return PseudoRandom(math.abs(pos.x + pos.y * 3 + pos.z * 5) + banana_seed)
 end
@@ -21,9 +21,10 @@ local function facedir_to_offset(dir, zoff)
 	return -1
 end
 
--- TODO: hopefully it doesn't look too swastika
-local c_banana_stem, c_banana_leaf, c_banana_bow, c_banana_trager
-local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
+local c_banana_stem, c_banana_leaf, c_banana_bow, c_banana_trager, overridables
+local function calc_banana(pos, stem_h, area, actual_nodes, actual_param2s, pr)
+	local nodes = {}
+	local param2s = {}
 	local yo = area.ystride
 	local zo = area.zstride
 	local orient = pr:next(0, 3)
@@ -58,12 +59,12 @@ local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
 				end
 				-- set a leaf where it's near the stem
 				nodes[vi] = c_banana_leaf
-				param2s[vi] = lorient
+				--~ param2s[vi] = lorient
 
 				-- set a leaf touching the previous one on only an upper corner
 				vi = vi + dir + yo
 				nodes[vi] = c_banana_leaf
-				param2s[vi] = lorient
+				--~ param2s[vi] = lorient
 
 				-- set a leaf next to it, alternatingly left and right
 				local lnorient
@@ -76,7 +77,7 @@ local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
 				local ndir = facedir_to_offset(lnorient, zo)
 				vi = vi + ndir
 				nodes[vi] = c_banana_leaf
-				param2s[vi] = lorient
+				--~ param2s[vi] = lorient
 			end
 		end
 	end
@@ -92,10 +93,18 @@ local function calc_banana(pos, stem_h, area, nodes, param2s, pr)
 	nodes[vi2] = c_banana_trager
 	vi = vi + yo
 	nodes[vi] = c_banana_leaf
-	param2s[vi] = orient
+	--~ param2s[vi] = orient
 	vi2 = vi2 + yo * pr:next(2, 3)
 	nodes[vi2] = c_banana_leaf
-	param2s[vi2] = orient
+	--~ param2s[vi2] = orient
+
+	for i,v in pairs(nodes) do
+		local current_c = actual_nodes[i]
+		if overridables[current_c] then
+			actual_nodes[i] = v
+			actual_param2s[i] = param2s[i] or actual_param2s[i]
+		end
+	end
 end
 
 local function spawn_banana(pos)
@@ -132,14 +141,10 @@ end
 
 
 minetest.register_node("farming_plus:banana_stem", {
-	tiles = {"farming_banana_stem_top.png", "farming_banana_stem_top.png",
-		"farming_banana_stem_side.png"},
+	tiles = {"farming_banana_stem_side.png"},
 	groups = {snappy=3, flammable=2, not_in_creative_inventory=1},
 	drop = "default:mese",
 	sounds = default.node_sound_leaves_defaults(),
-	on_place = function(_,_, pt)
-		spawn_banana(pt.above)
-	end
 })
 
 minetest.register_node("farming_plus:banana_stem_bow", {
@@ -159,16 +164,18 @@ minetest.register_node("farming_plus:banana_stem_bow", {
 	sounds = default.node_sound_leaves_defaults(),
 })
 
-minetest.register_node("farming_plus:banana_leaf", {
+minetest.register_node("farming_plus:banana_leaves", {
 	drawtype = "allfaces_optional",
 	tiles = {"farming_banana_leaves.png"},
 	paramtype = "light",
+	-- unfortunately leaves don't support rotation
+	--~ paramtype2 = "facedir",
 	groups = {snappy=3, leafdecay=3, flammable=2, not_in_creative_inventory=1},
 	drop = {
 		max_items = 1,
 		items = {
 			{
-				items = {'farming_plus:banana_sapling'},
+				items = {"farming_plus:banana_sapling"},
 				rarity = 20,
 			},
 			{
@@ -179,30 +186,42 @@ minetest.register_node("farming_plus:banana_leaf", {
 	sounds = default.node_sound_leaves_defaults(),
 })
 
--- TODO: make it look like many bananas
+-- TODO: leafdecay
+
 minetest.register_node("farming_plus:bananas", {
-	description = S"Banana Träger",
-	tiles = {"farming_banana.png"},
-	drawtype = "torchlike",
+	description = S"Banana Carrier",
+	tiles = {"farming_bananas.png"},
+	drawtype = "plantlike",
 	paramtype = "light",
 	groups = {fleshy=3,dig_immediate=3,flammable=2,leafdecay=3,
 		leafdecay_drop=1, not_in_creative_inventory=1},
 	sounds = default.node_sound_defaults(),
 
-	-- TODO: variable drop count
-	drop = "farming_plus:banana 5",
+	drop = {
+		max_items = 7,
+		items = {
+			{
+				items = {"farming_plus:banana 3"},
+				rarity = 1,
+			},
+			{
+				items = {"farming_plus:banana 2"},
+				rarity = 4,
+			},
+			{
+				items = {"farming_plus:banana 2"},
+				rarity = 4,
+			},
+		},
+	},
 })
 
-c_banana_stem = minetest.get_content_id"farming_plus:banana_stem"
-c_banana_bow = minetest.get_content_id"farming_plus:banana_stem_bow"
-c_banana_leaf = minetest.get_content_id"farming_plus:banana_leaf"
-c_banana_trager = minetest.get_content_id"farming_plus:bananas"
-
-
--- TODO: generate, sapling, textures
+local function simulate_abm_time(i, c)
+	return i * math.ceil(math.log(1 - math.random()) / math.log((c - 1) / c))
+end
 
 minetest.register_node("farming_plus:banana_sapling", {
-	description = S("Banana Tree Sapling"),
+	description = S("Banana Sapling"),
 	drawtype = "plantlike",
 	tiles = {"farming_banana_sapling.png"},
 	inventory_image = "farming_banana_sapling.png",
@@ -216,44 +235,51 @@ minetest.register_node("farming_plus:banana_sapling", {
 	groups = {snappy = 2, dig_immediate = 3, flammable = 2,
 		attached_node = 1, sapling = 1},
 	sounds = default.node_sound_defaults(),
+
+	on_construct = function(pos)
+		minetest.get_node_timer(pos):start(simulate_abm_time(60, 20))
+	end,
+	on_timer = function(pos)
+		if not default.can_grow(pos) then
+			minetest.get_node_timer(pos):start(300)
+			return
+		end
+		spawn_banana(pos)
+	end,
+
+	on_place = function(itemstack, placer, pointed_thing)
+		itemstack = default.sapling_on_place(itemstack, placer, pointed_thing,
+			"farming_plus:banana_sapling",
+			{x = -3, y = 1, z = -3},
+			{x = 3, y = 9, z = 3},
+			2)
+
+		return itemstack
+	end,
 })
 
-minetest.register_node("farming_plus:banana_leaves", {
-	drawtype = "allfaces_optional",
-	tiles = {"farming_banana_leaves.png"},
-	paramtype = "light",
-	groups = {snappy=3, leafdecay=3, flammable=2, not_in_creative_inventory=1},
-	drop = {
-		max_items = 1,
-		items = {
-			{
-				items = {'farming_plus:banana_sapling'},
-				rarity = 20,
-			},
-		}
-	},
-	sounds = default.node_sound_leaves_defaults(),
-})
+c_banana_stem = minetest.get_content_id"farming_plus:banana_stem"
+c_banana_bow = minetest.get_content_id"farming_plus:banana_stem_bow"
+c_banana_leaf = minetest.get_content_id"farming_plus:banana_leaves"
+c_banana_trager = minetest.get_content_id"farming_plus:bananas"
+overridables = {
+	[minetest.get_content_id"air"] = true,
+	[minetest.get_content_id"ignore"] = true,
+	[minetest.get_content_id"farming_plus:banana_sapling"] = true,
+	[c_banana_leaf] = true,
+}
 
-minetest.register_abm({
-	nodenames = {"farming_plus:banana_sapling"},
-	interval = 60,
-	chance = 20,
-	action = function(pos, node)
-		farming.generate_tree(pos, "default:tree", "farming_plus:banana_leaves", {"default:dirt", "default:dirt_with_grass"}, {["farming_plus:banana"]=20})
-	end
-})
-
-minetest.register_on_generated(function(minp, maxp, blockseed)
-	if math.random(1, 100) > 5 then
-		return
-	end
-	local tmp = {x=(maxp.x-minp.x)/2+minp.x, y=(maxp.y-minp.y)/2+minp.y, z=(maxp.z-minp.z)/2+minp.z}
-	local pos = minetest.find_node_near(tmp, maxp.x-minp.x, {"default:dirt_with_grass"})
-	if pos then
-		farming.generate_tree({x=pos.x, y=pos.y+1, z=pos.z}, "default:tree", "farming_plus:banana_leaves",  {"default:dirt", "default:dirt_with_grass"}, {["farming_plus:banana"]=10})
-	end
-end)
+-- TODO: this mapgen looks slow, the new one should be different
+--~ minetest.register_on_generated(function(minp, maxp, blockseed)
+	--~ if math.random(1, 100) > 5 then
+		--~ return
+	--~ end
+	--~ local tmp = {x=(maxp.x-minp.x)/2+minp.x, y=(maxp.y-minp.y)/2+minp.y, z=(maxp.z-minp.z)/2+minp.z}
+	--~ local pos = minetest.find_node_near(tmp, maxp.x-minp.x, {"default:dirt_with_grass"})
+	--~ if pos then
+		--~ farming.generate_tree({x=pos.x, y=pos.y+1, z=pos.z}, "default:tree", "farming_plus:banana_leaves",  {"default:dirt", "default:dirt_with_grass"}, {["farming_plus:banana"]=10})
+	--~ end
+--~ end)
 
 minetest.register_node("farming_plus:banana", {
 	description = S("Banana"),
