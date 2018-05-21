@@ -141,13 +141,14 @@ end
 
 
 minetest.register_node("farming_plus:banana_stem", {
+	description = S"Banana Pseudostem",
 	tiles = {"farming_banana_stem_side.png"},
-	groups = {snappy=3, flammable=2, not_in_creative_inventory=1},
-	drop = "default:mese",
+	groups = {snappy=3, flammable=2},
 	sounds = default.node_sound_leaves_defaults(),
 })
 
 minetest.register_node("farming_plus:banana_stem_bow", {
+	description = S"Banana Pseudostem Bow",
 	tiles = {"farming_banana_stem_side.png"},
 	drawtype = "nodebox",
 	node_box = {
@@ -160,17 +161,18 @@ minetest.register_node("farming_plus:banana_stem_bow", {
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = {snappy=3, flammable=2, not_in_creative_inventory=1},
-	drop = "default:mese",
+	drop = "farming_plus:banana_stem",
 	sounds = default.node_sound_leaves_defaults(),
 })
 
 minetest.register_node("farming_plus:banana_leaves", {
+	description = S"Banana Leaves",
 	drawtype = "allfaces_optional",
 	tiles = {"farming_banana_leaves.png"},
 	paramtype = "light",
 	-- unfortunately leaves don't support rotation
 	--~ paramtype2 = "facedir",
-	groups = {snappy=3, leafdecay=3, flammable=2, not_in_creative_inventory=1},
+	groups = {snappy=3, leafdecay=3, flammable=2},
 	drop = {
 		max_items = 1,
 		items = {
@@ -221,7 +223,7 @@ local function simulate_abm_time(i, c)
 end
 
 minetest.register_node("farming_plus:banana_sapling", {
-	description = S("Banana Sapling"),
+	description = S"Banana Sapling",
 	drawtype = "plantlike",
 	tiles = {"farming_banana_sapling.png"},
 	inventory_image = "farming_banana_sapling.png",
@@ -232,8 +234,7 @@ minetest.register_node("farming_plus:banana_sapling", {
 		type = "fixed",
 		fixed = {-0.3, -0.5, -0.3, 0.3, 0.35, 0.3}
 	},
-	groups = {snappy = 2, dig_immediate = 3, flammable = 2,
-		attached_node = 1, sapling = 1},
+	groups = {snappy = 2, flammable = 2, attached_node = 1, sapling = 1},
 	sounds = default.node_sound_defaults(),
 
 	on_construct = function(pos)
@@ -262,24 +263,89 @@ c_banana_stem = minetest.get_content_id"farming_plus:banana_stem"
 c_banana_bow = minetest.get_content_id"farming_plus:banana_stem_bow"
 c_banana_leaf = minetest.get_content_id"farming_plus:banana_leaves"
 c_banana_trager = minetest.get_content_id"farming_plus:bananas"
+local c_banana_sapling = minetest.get_content_id"farming_plus:banana_sapling"
 overridables = {
 	[minetest.get_content_id"air"] = true,
 	[minetest.get_content_id"ignore"] = true,
-	[minetest.get_content_id"farming_plus:banana_sapling"] = true,
+	[c_banana_sapling] = true,
 	[c_banana_leaf] = true,
 }
 
--- TODO: this mapgen looks slow, the new one should be different
---~ minetest.register_on_generated(function(minp, maxp, blockseed)
-	--~ if math.random(1, 100) > 5 then
-		--~ return
-	--~ end
-	--~ local tmp = {x=(maxp.x-minp.x)/2+minp.x, y=(maxp.y-minp.y)/2+minp.y, z=(maxp.z-minp.z)/2+minp.z}
-	--~ local pos = minetest.find_node_near(tmp, maxp.x-minp.x, {"default:dirt_with_grass"})
-	--~ if pos then
-		--~ farming.generate_tree({x=pos.x, y=pos.y+1, z=pos.z}, "default:tree", "farming_plus:banana_leaves",  {"default:dirt", "default:dirt_with_grass"}, {["farming_plus:banana"]=10})
-	--~ end
---~ end)
+
+local gen_height_min = 1
+local gen_height_max = 30
+
+-- firstly, generate saplings using a decoration
+minetest.register_decoration{
+	deco_type = "simple",
+	place_on = {"default:dirt_with_grass"},
+	biomes = {"rainforest", "rainforest_swamp"},
+	sidelen = 16,
+	noise_params = {
+		offset = 0,
+		scale = 0.007,
+		spread = {x = 1000, y = 1000, z = 1000},
+		seed = 329,
+		octaves = 3,
+		persist = 0.6
+	},
+	y_min = gen_height_min,
+	y_max = gen_height_max,
+	decoration = "farming_plus:banana_sapling",
+}
+
+-- secondly, replace the saplings with grown bananas
+local mg_data = {}
+local mg_param2s = {}
+minetest.register_on_generated(function(minp, maxp, seed)
+	if maxp.y < gen_height_min
+	or minp.y >= gen_height_max then
+		return
+	end
+
+	local t1 = minetest.get_us_time()
+	local cnt = 0
+
+	local vm, emin, emax = minetest.get_mapgen_object"voxelmanip"
+	vm:get_data(mg_data)
+	vm:get_param2_data(mg_param2s)
+	local area = VoxelArea:new{MinEdge=emin, MaxEdge=emax}
+
+	local heightmap = minetest.get_mapgen_object"heightmap"
+	local hmi = 1
+
+	local pr = PseudoRandom(seed + 73)
+
+	for z = minp.z, maxp.z do
+		for x = minp.x, maxp.x do
+			local y = heightmap[hmi]+1
+			local vi = area:index(x, y, z)
+			if mg_data[vi] == c_banana_sapling then
+				calc_banana({x=x, y=y, z=z}, pr:next(4, 6), area, mg_data,
+					mg_param2s, pr)
+				cnt = cnt+1
+			end
+			hmi = hmi+1
+		end
+	end
+
+	if cnt == 0 then
+		return
+	end
+
+	vm:set_data(mg_data)
+	vm:set_param2_data(mg_param2s)
+
+	-- light calculation unfortunately takes some time
+	vm:set_lighting{day=0, night=0}
+	vm:calc_lighting()
+	vm:write_to_map()
+
+	minetest.log("info",
+		("[farming_plus] %d bananas generated after ca. %g seconds."):format(
+		cnt, (minetest.get_us_time() - t1) / 1000000))
+end)
+
 
 minetest.register_node("farming_plus:banana", {
 	description = S("Banana"),
