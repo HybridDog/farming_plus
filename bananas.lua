@@ -188,14 +188,12 @@ minetest.register_node("farming_plus:banana_leaves", {
 	sounds = default.node_sound_leaves_defaults(),
 })
 
--- TODO: leafdecay
-
 minetest.register_node("farming_plus:bananas", {
 	description = S"Banana Carrier",
 	tiles = {"farming_bananas.png"},
 	drawtype = "plantlike",
 	paramtype = "light",
-	groups = {fleshy=3,dig_immediate=3,flammable=2,leafdecay=3,
+	groups = {fleshy=3, dig_immediate=3, flammable=2, leafdecay=3,
 		leafdecay_drop=1, not_in_creative_inventory=1},
 	sounds = default.node_sound_defaults(),
 
@@ -217,6 +215,14 @@ minetest.register_node("farming_plus:bananas", {
 		},
 	},
 })
+
+default.register_leafdecay{
+	trunks = {"farming_plus:banana_stem", "farming_plus:banana_stem_bow"},
+	leaves = {"farming_plus:bananas", "farming_plus:banana_leaves",
+		"farming_plus:banana_stem_bow"},
+	radius = 2,
+}
+
 
 local function simulate_abm_time(i, c)
 	return i * math.ceil(math.log(1 - math.random()) / math.log((c - 1) / c))
