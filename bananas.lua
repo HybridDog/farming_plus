@@ -240,7 +240,7 @@ minetest.register_node("farming_plus:banana_sapling", {
 		type = "fixed",
 		fixed = {-0.3, -0.5, -0.3, 0.3, 0.35, 0.3}
 	},
-	groups = {snappy = 2, flammable = 2, attached_node = 1, sapling = 1},
+	groups = {snappy = 3, flammable = 2, attached_node = 1, sapling = 1},
 	sounds = default.node_sound_defaults(),
 
 	on_construct = function(pos)
